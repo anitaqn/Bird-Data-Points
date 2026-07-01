@@ -18,25 +18,26 @@ Stage 1 — Discovery
 
 ## Current pass or activity
 
-Pass 0 — Origin interview
+Pass 2 — Research-driven refinement
 
 ## Positioning statement status
 
 One line per clause. Status values: `not started` | `drafted from belief` | `drafted-unconfirmed` | `refined by research` | `evidenced by interview` | `stable`.
 
-- Target customer: not started
-- Need or opportunity: not started
-- Product name: not started
-- Product category: not started
-- Key benefit: not started
-- Primary competitive alternative: not started
-- Primary differentiation: not started
+- Target customer: drafted-unconfirmed
+- Need or opportunity: drafted-unconfirmed
+- Product name: drafted from belief
+- Product category: drafted from belief
+- Key benefit: drafted-unconfirmed
+- Primary competitive alternative: drafted-unconfirmed
+- Primary differentiation: drafted-unconfirmed
 
 ## Completed checkpoints
 
 A running list. Each entry is a single line: what was completed, and the date.
 
-- (none yet)
+- 2026-06-28: Pass 0 — Origin interview (friend, birdwatcher/conservationist)
+- 2026-06-28: Pass 1 — First draft of all seven clauses
 
 ## Known gaps
 
@@ -45,5 +46,5 @@ A running list. Each entry is a single line: what was completed, and the date.
 
 ## Last updated
 
-- **Date:** 2026-06-26
-- **By:** ua-orchestrator
+- **Date:** 2026-06-28
+- **By:** positioning-statement
