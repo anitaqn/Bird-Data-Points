@@ -2,7 +2,6 @@ const CACHE = 'birdpoint-v3';
 const LOCAL = [
   './',
   './index.html',
-  './birdpoint-data.json',
   './manifest.json',
   './icon-192.png',
   './icon-512.png'
