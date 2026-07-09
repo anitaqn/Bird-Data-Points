@@ -436,7 +436,7 @@
     <div class="form-group">
       <label class="form-label">Photo (optional)</label>
       <input type="file" id="photo-input" accept="image/*" style="display:none" onchange="handlePhoto(event)" />
-      <button class="photo-btn" id="photo-btn" onclick="document.getElementById('photo-input').click()">📷 Take or Upload Photo</button>
+      <label class="photo-btn" id="photo-btn" for="photo-input">📷 Take or Upload Photo</label>
       <div class="photo-preview" id="photo-preview">
         <img id="photo-img" src="" alt="preview" />
         <button class="photo-remove" onclick="clearPhoto()">✕ Remove</button>
