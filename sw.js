@@ -1,4 +1,4 @@
-const CACHE = 'birdpoint-v2';
+const CACHE = 'birdpoint-v3';
 const LOCAL = [
   './',
   './index.html',
