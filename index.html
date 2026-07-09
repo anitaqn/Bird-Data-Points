@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Birdpoint</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#2d5a3d" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Birdpoint" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+
+  <!-- MapLibre GL -->
+  <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f5f5f0;
+      color: #1a1a1a;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ── SCREENS ── */
+    .screen { display: none; height: 100vh; flex-direction: column; }
+    .screen.active { display: flex; }
+
+    /* ── HOME ── */
+    #home {
+      position: relative; overflow: hidden;
+      background: linear-gradient(180deg, #061a0e 0%, #0d2818 35%, #1a3a2a 65%, #254d37 100%);
+      color: white; justify-content: center; align-items: center; padding: 0;
+    }
+    #home .home-scene {
+      position: absolute; inset: 0; pointer-events: none;
+    }
+    #home .home-content {
+      position: relative; z-index: 2;
+      width: 100%; padding: 2.5rem 2rem;
+      display: flex; flex-direction: column; gap: 1.5rem; align-items: center;
+      text-align: center;
+    }
+    #home .home-brand { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; }
+    #home .home-icon {
+      width: 64px; height: 64px; border-radius: 18px;
+      background: rgba(255,255,255,0.12); backdrop-filter: blur(8px);
+      border: 1.5px solid rgba(255,255,255,0.2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2rem; margin-bottom: 0.2rem;
+    }
+    #home h1 {
+      font-size: 2.6rem; font-weight: 800; letter-spacing: -1px;
+      line-height: 1; color: white;
+    }
+    #home .home-tagline {
+      font-size: 0.95rem; color: rgba(255,255,255,0.65);
+      max-width: 300px; line-height: 1.55;
+    }
+    .home-stats {
+      display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;
+    }
+    .home-stat {
+      background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 20px; padding: 0.3rem 0.85rem;
+      font-size: 0.78rem; font-weight: 600; color: rgba(255,255,255,0.85);
+      backdrop-filter: blur(4px);
+    }
+    .home-buttons { display: flex; flex-direction: column; gap: 0.75rem; width: 100%; max-width: 320px; }
+    .btn-primary {
+      background: white; color: #0d2818;
+      border: none; border-radius: 14px;
+      padding: 1rem 1.5rem; font-size: 1rem; font-weight: 700;
+      cursor: pointer; display: flex; align-items: center; gap: 0.6rem; justify-content: center;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+    .btn-primary:active { transform: scale(0.98); box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
+    .btn-secondary {
+      background: rgba(255,255,255,0.1); color: white;
+      border: 1.5px solid rgba(255,255,255,0.3); border-radius: 14px;
+      padding: 1rem 1.5rem; font-size: 1rem; font-weight: 600;
+      cursor: pointer; display: flex; align-items: center; gap: 0.6rem; justify-content: center;
+      backdrop-filter: blur(6px);
+      transition: background 0.15s;
+    }
+    .btn-secondary:active { background: rgba(255,255,255,0.2); }
+
+    /* ── MAP ── */
+    #map-screen { position: relative; }
+    #map { flex: 1; width: 100%; }
+    .map-header {
+      position: absolute; top: 0; left: 0; right: 0; z-index: 10;
+      padding: 1rem;
+      display: flex; gap: 0.5rem; align-items: center;
+    }
+    .back-btn {
+      background: white; border: none; border-radius: 10px;
+      padding: 0.6rem 0.9rem; cursor: pointer; font-size: 1rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    .map-search {
+      flex: 1; padding: 0.65rem 1rem; border: none; border-radius: 10px;
+      font-size: 0.95rem; box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      outline: none;
+    }
+
+    /* ── PANEL (location + species detail) ── */
+    .panel-overlay {
+      position: absolute; bottom: 0; left: 0; right: 0; z-index: 20;
+      background: white; border-radius: 20px 20px 0 0;
+      box-shadow: 0 -4px 24px rgba(0,0,0,0.15);
+      max-height: 70vh; display: flex; flex-direction: column;
+      transform: translateY(100%); transition: transform 0.3s ease;
+    }
+    .panel-overlay.open { transform: translateY(0); }
+    .panel-handle {
+      width: 36px; height: 4px; background: #ddd; border-radius: 2px;
+      margin: 10px auto 0;
+    }
+    .panel-header {
+      padding: 0.75rem 1rem 0.5rem;
+      display: flex; align-items: center; gap: 0.75rem;
+    }
+    .panel-header h2 { font-size: 1.1rem; font-weight: 700; flex: 1; }
+    .panel-close {
+      background: #f0f0f0; border: none; border-radius: 50%;
+      width: 28px; height: 28px; cursor: pointer; font-size: 1rem;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .panel-body { overflow-y: auto; flex: 1; padding: 0 1rem 1rem; }
+
+    /* ── LOCATION DETAIL ── */
+    .location-meta { font-size: 0.8rem; color: #666; margin-bottom: 0.75rem; }
+    .search-bar {
+      width: 100%; padding: 0.6rem 0.9rem;
+      border: 1.5px solid #e0e0e0; border-radius: 10px;
+      font-size: 0.9rem; margin-bottom: 0.75rem; outline: none;
+    }
+    .search-bar:focus { border-color: #2d5a3d; }
+    .species-list { display: flex; flex-direction: column; gap: 0.5rem; }
+    .species-item {
+      display: flex; align-items: center; gap: 0.75rem;
+      padding: 0.75rem; border-radius: 12px; background: #f8f8f5;
+      cursor: pointer; border: 1.5px solid transparent; transition: border-color 0.15s;
+    }
+    .species-item:hover { border-color: #2d5a3d; }
+    .species-icon {
+      width: 44px; height: 44px; border-radius: 10px;
+      background: #e8f0eb; display: flex; align-items: center; justify-content: center;
+      font-size: 1.4rem; flex-shrink: 0; overflow: hidden;
+    }
+    .species-name { font-weight: 600; font-size: 0.9rem; }
+    .species-sci { font-size: 0.75rem; color: #888; font-style: italic; margin-top: 1px; }
+    .species-count { font-size: 0.75rem; color: #666; margin-top: 1px; }
+    .no-results { text-align: center; color: #999; padding: 2rem 0; font-size: 0.9rem; }
+
+    /* ── SPECIES DETAIL ── */
+    #species-panel .panel-body { padding-bottom: 2rem; }
+    .species-hero {
+      display: flex; gap: 1rem; align-items: flex-start;
+      padding: 0.5rem 0 1rem;
+    }
+    .species-hero-icon {
+      width: 64px; height: 64px; border-radius: 14px;
+      background: #e8f0eb; display: flex; align-items: center;
+      justify-content: center; font-size: 2.5rem; flex-shrink: 0; overflow: hidden;
+    }
+    .species-hero h3 { font-size: 1.15rem; font-weight: 700; margin-bottom: 0.2rem; }
+    .species-hero .sci-name { font-size: 0.8rem; color: #666; font-style: italic; }
+    .species-hero .location-tag {
+      font-size: 0.75rem; color: #2d5a3d; background: #e8f0eb;
+      padding: 0.2rem 0.5rem; border-radius: 20px; display: inline-block; margin-top: 0.4rem;
+    }
+    .species-desc { font-size: 0.88rem; line-height: 1.6; color: #333; margin-bottom: 1.25rem; }
+
+    .section-title { font-size: 0.85rem; font-weight: 700; color: #444; margin-bottom: 0.6rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    .chart-container { position: relative; height: 160px; margin-bottom: 0.5rem; }
+    .data-note { font-size: 0.75rem; color: #999; margin-bottom: 1.25rem; }
+
+    .data-table {
+      width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-bottom: 1.25rem;
+      display: none;
+    }
+    .data-table.visible { display: table; }
+    .data-table th, .data-table td {
+      padding: 0.4rem 0.6rem; text-align: left;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .data-table th { font-weight: 600; color: #666; font-size: 0.78rem; text-transform: uppercase; }
+    .data-table td.null-val { color: #bbb; font-style: italic; }
+    .toggle-table-btn {
+      background: none; border: 1.5px solid #e0e0e0; border-radius: 8px;
+      padding: 0.4rem 0.8rem; font-size: 0.8rem; cursor: pointer;
+      margin-bottom: 1.25rem; color: #444;
+    }
+
+    .ai-card {
+      background: #f0f7f2; border-radius: 14px; padding: 1rem; margin-bottom: 1rem;
+    }
+    .ai-card .ai-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.6rem; }
+    .ai-card .ai-header span { font-weight: 700; font-size: 0.9rem; }
+    .ai-suggestions { font-size: 0.87rem; line-height: 1.6; color: #2a4a2a; margin-bottom: 0.75rem; }
+    .ai-suggestions ul { padding-left: 1.2rem; }
+    .ai-suggestions li { margin-bottom: 0.3rem; }
+    .ai-input-row { display: flex; gap: 0.5rem; }
+    .ai-input {
+      flex: 1; padding: 0.55rem 0.8rem; border: 1.5px solid #c8e0d0;
+      border-radius: 8px; font-size: 0.85rem; background: white; outline: none;
+    }
+    .ai-ask-btn {
+      background: #2d5a3d; color: white; border: none; border-radius: 8px;
+      padding: 0.55rem 0.9rem; font-size: 0.85rem; cursor: pointer; font-weight: 600;
+    }
+
+    /* ── LOG SIGHTING ── */
+    #log-screen {
+      background: white;
+    }
+    .log-header {
+      padding: 1rem; display: flex; align-items: center; gap: 0.75rem;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .log-header h2 { font-size: 1.1rem; font-weight: 700; }
+    .log-body { padding: 1.25rem; flex: 1; overflow-y: auto; }
+    .form-group { margin-bottom: 1.1rem; }
+    .form-label { font-size: 0.82rem; font-weight: 600; color: #444; margin-bottom: 0.4rem; display: block; }
+    .form-input, .form-select, .form-textarea {
+      width: 100%; padding: 0.7rem 0.9rem;
+      border: 1.5px solid #e0e0e0; border-radius: 10px;
+      font-size: 0.9rem; font-family: inherit; outline: none; background: white;
+    }
+    .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: #2d5a3d; }
+    .form-textarea { height: 80px; resize: none; }
+    .photo-btn {
+      background: #f5f5f0; border: 1.5px dashed #ccc; border-radius: 10px;
+      padding: 1rem; width: 100%; cursor: pointer; font-size: 0.9rem; color: #666;
+      display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+    }
+    .submit-btn {
+      width: 100%; background: #2d5a3d; color: white; border: none;
+      border-radius: 12px; padding: 1rem; font-size: 1rem; font-weight: 700;
+      cursor: pointer; margin-top: 0.5rem;
+    }
+    .submit-btn:hover { background: #1a3a2a; }
+    .confirm-banner {
+      display: none; background: #e8f5ee; border-radius: 10px;
+      padding: 1rem; text-align: center; margin-top: 1rem;
+      color: #1a3a2a; font-weight: 600;
+    }
+    .confirm-banner.show { display: block; }
+    .sighting-card {
+      background: #f8f8f5; border-radius: 12px; padding: 0.85rem 1rem;
+      margin-bottom: 0.6rem; border-left: 3px solid #e8a020;
+    }
+    .sighting-card .sc-species { font-weight: 700; font-size: 0.95rem; }
+    .sighting-card .sc-meta { font-size: 0.78rem; color: #666; margin-top: 0.2rem; }
+    .sighting-card .sc-notes { font-size: 0.82rem; color: #444; margin-top: 0.4rem; font-style: italic; }
+    .sighting-card .sc-delete {
+      float: right; background: none; border: none; cursor: pointer;
+      font-size: 0.8rem; color: #bbb; padding: 0;
+    }
+    .sighting-card .sc-delete:hover { color: #e74c3c; }
+    .no-sightings { text-align: center; color: #999; padding: 2.5rem 0; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+
+<!-- ══ HOME ══ -->
+<div id="home" class="screen active">
+
+  <!-- Background scene: stars, birds, treeline -->
+  <svg class="home-scene" viewBox="0 0 390 844" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+    <!-- Stars -->
+    <circle cx="42" cy="55" r="1.2" fill="rgba(255,255,255,0.5)"/>
+    <circle cx="110" cy="32" r="0.8" fill="rgba(255,255,255,0.4)"/>
+    <circle cx="185" cy="20" r="1.4" fill="rgba(255,255,255,0.6)"/>
+    <circle cx="260" cy="45" r="0.9" fill="rgba(255,255,255,0.35)"/>
+    <circle cx="330" cy="28" r="1.1" fill="rgba(255,255,255,0.5)"/>
+    <circle cx="72" cy="100" r="0.7" fill="rgba(255,255,255,0.3)"/>
+    <circle cx="300" cy="90" r="1.0" fill="rgba(255,255,255,0.4)"/>
+    <circle cx="155" cy="75" r="0.6" fill="rgba(255,255,255,0.35)"/>
+    <circle cx="355" cy="70" r="1.2" fill="rgba(255,255,255,0.45)"/>
+    <circle cx="20" cy="140" r="0.8" fill="rgba(255,255,255,0.3)"/>
+
+    <!-- Moon glow -->
+    <circle cx="310" cy="80" r="28" fill="rgba(255,255,220,0.06)"/>
+    <circle cx="310" cy="80" r="18" fill="rgba(255,255,220,0.08)"/>
+    <circle cx="310" cy="80" r="10" fill="rgba(255,255,220,0.15)"/>
+
+    <!-- Flying birds (silhouettes) -->
+    <!-- Bird 1 - large, upper left -->
+    <g transform="translate(75,130) scale(1.3)">
+      <path d="M0,0 C-7,-5 -13,-2 -16,2 C-13,0 -7,2 0,0 C7,2 13,0 16,2 C13,-2 7,-5 0,0Z" fill="rgba(255,255,255,0.55)"/>
+    </g>
+    <!-- Bird 2 - medium -->
+    <g transform="translate(130,105) scale(0.9)">
+      <path d="M0,0 C-7,-5 -13,-2 -16,2 C-13,0 -7,2 0,0 C7,2 13,0 16,2 C13,-2 7,-5 0,0Z" fill="rgba(255,255,255,0.4)"/>
+    </g>
+    <!-- Bird 3 - small, high -->
+    <g transform="translate(175,88) scale(0.65)">
+      <path d="M0,0 C-7,-5 -13,-2 -16,2 C-13,0 -7,2 0,0 C7,2 13,0 16,2 C13,-2 7,-5 0,0Z" fill="rgba(255,255,255,0.35)"/>
+    </g>
+    <!-- Bird 4 - medium right -->
+    <g transform="translate(255,118) scale(1.0)">
+      <path d="M0,0 C-7,-5 -13,-2 -16,2 C-13,0 -7,2 0,0 C7,2 13,0 16,2 C13,-2 7,-5 0,0Z" fill="rgba(255,255,255,0.45)"/>
+    </g>
+    <!-- Bird 5 - tiny far right -->
+    <g transform="translate(320,95) scale(0.55)">
+      <path d="M0,0 C-7,-5 -13,-2 -16,2 C-13,0 -7,2 0,0 C7,2 13,0 16,2 C13,-2 7,-5 0,0Z" fill="rgba(255,255,255,0.3)"/>
+    </g>
+
+    <!-- Forest treeline silhouette -->
+    <path d="
+      M-10,780
+      L0,680 L18,720 L30,640 L50,690 L62,600 L80,660 L95,570
+      L110,630 L125,540 L140,600 L155,510 L168,570 L182,500
+      L195,560 L210,490 L225,555 L238,480 L252,545 L265,470
+      L278,535 L292,460 L308,530 L322,450 L338,520 L352,445
+      L368,510 L382,460 L400,520 L400,844 L-10,844Z"
+      fill="#061a0e"/>
+
+    <!-- Lighter middle-ground trees -->
+    <path d="
+      M-10,820
+      L10,740 L28,770 L45,710 L62,750 L78,690 L95,730
+      L115,670 L132,710 L148,660 L165,700 L185,640 L200,680
+      L218,625 L235,665 L255,605 L270,648 L290,590 L308,635
+      L328,575 L345,618 L365,562 L382,605 L400,560 L400,844 L-10,844Z"
+      fill="#0a2214"/>
+  </svg>
+
+  <!-- Content overlay -->
+  <div class="home-content">
+    <div class="home-brand">
+      <h1>Birdpoint</h1>
+      <p class="home-tagline">Explore bird population trends across U.S. ecosystems — no spreadsheets required.</p>
+    </div>
+
+    <div class="home-stats">
+      <span class="home-stat">🗺 6 NEON Sites</span>
+      <span class="home-stat">🐦 150+ Families</span>
+      <span class="home-stat">📅 2017–2022</span>
+    </div>
+
+    <div class="home-buttons">
+      <button class="btn-primary" onclick="showMap()">🗺 Explore Map</button>
+      <button class="btn-secondary" onclick="showLog()">📝 Log a Sighting</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══ MAP ══ -->
+<div id="map-screen" class="screen">
+  <div class="map-header">
+    <button class="back-btn" onclick="showScreen('home')">←</button>
+    <div style="flex:1;position:relative;">
+      <input class="map-search" type="text" placeholder="Search location..." id="map-search-input"
+        oninput="searchLocations()" onblur="setTimeout(()=>closeSearchDrop(),150)" autocomplete="off" style="width:100%;box-sizing:border-box;" />
+      <div id="search-drop" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;background:white;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,0.15);overflow:hidden;z-index:99;"></div>
+    </div>
+    <button class="back-btn" id="my-sightings-btn" onclick="openSightingsPanel()" style="white-space:nowrap;background:#2d5a3d;color:white;border:none;">📋 <span id="sighting-count"></span></button>
+  </div>
+  <div id="map"></div>
+
+  <!-- Location Detail Panel -->
+  <div class="panel-overlay" id="location-panel">
+    <div class="panel-handle"></div>
+    <div class="panel-header">
+      <h2 id="location-name">Location</h2>
+      <button class="panel-close" onclick="closePanel('location-panel')">✕</button>
+    </div>
+    <div class="panel-body">
+      <p class="location-meta" id="location-meta"></p>
+      <input class="search-bar" type="text" placeholder="Search species..." id="species-search" oninput="filterSpecies()" />
+      <div class="species-list" id="species-list"></div>
+    </div>
+  </div>
+
+  <!-- My Sightings Panel -->
+  <div class="panel-overlay" id="sightings-panel">
+    <div class="panel-handle"></div>
+    <div class="panel-header">
+      <h2>My Sightings</h2>
+      <button class="panel-close" onclick="closePanel('sightings-panel')">✕</button>
+    </div>
+    <div class="panel-body" id="sightings-list"></div>
+  </div>
+
+  <!-- Species Detail Panel -->
+  <div class="panel-overlay" id="species-panel">
+    <div class="panel-handle"></div>
+    <div class="panel-header">
+      <button class="back-btn" style="box-shadow:none;background:#f0f0f0;" onclick="closePanel('species-panel')">←</button>
+      <h2 id="species-title">Species</h2>
+      <button class="panel-close" onclick="closePanel('species-panel')">✕</button>
+    </div>
+    <div class="panel-body" id="species-body"></div>
+  </div>
+</div>
+
+<!-- ══ LOG SIGHTING ══ -->
+<div id="log-screen" class="screen">
+  <div class="log-header">
+    <button class="back-btn" style="box-shadow:none;background:#f0f0f0;padding:0.5rem 0.75rem;" onclick="showScreen('home')">←</button>
+    <h2>Log a Sighting</h2>
+  </div>
+  <div class="log-body">
+    <div class="form-group">
+      <label class="form-label">Species *</label>
+      <input class="form-input" type="text" id="log-species" placeholder="e.g. Parulidae" />
+    </div>
+    <div class="form-group">
+      <label class="form-label">Location *</label>
+      <select class="form-select" id="log-location">
+        <option value="">Select a site...</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Photo (optional)</label>
+      <button class="photo-btn" onclick="alert('Camera/upload coming soon!')">📷 Take or Upload Photo</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Notes (optional)</label>
+      <textarea class="form-textarea" id="log-notes" placeholder="Anything notable about this sighting..."></textarea>
+    </div>
+    <button class="submit-btn" onclick="submitSighting()">Submit Sighting</button>
+    <div class="confirm-banner" id="confirm-banner">
+      ✓ Sighting logged! Returning to map...
+    </div>
+  </div>
+</div>
+
+<script>
+// ── INLINE DATA (no fetch needed) ────────────────────────────────────
+const BIRDPOINT_DATA = [{"id":"ABBY","name":"Abby Road, OR","lat":45.762439,"lng":-122.33032,"species":[{"name":"Parulidae","trend":{"2017":197,"2018":110,"2019":197,"2020":null,"2021":212,"2022":122},"total":838},{"name":"Emberizidae","trend":{"2017":114,"2018":104,"2019":208,"2020":null,"2021":159,"2022":130},"total":715},{"name":"Cardinalidae","trend":{"2017":136,"2018":73,"2019":189,"2020":null,"2021":118,"2022":84},"total":600},{"name":"Turdidae","trend":{"2017":56,"2018":60,"2019":141,"2020":null,"2021":164,"2022":37},"total":458},{"name":"Tyrannidae","trend":{"2017":63,"2018":66,"2019":80,"2020":null,"2021":49,"2022":65},"total":323},{"name":"Picidae","trend":{"2017":53,"2018":17,"2019":152,"2020":null,"2021":55,"2022":40},"total":317},{"name":"Columbidae","trend":{"2017":22,"2018":33,"2019":121,"2020":null,"2021":29,"2022":54},"total":259},{"name":"Troglodytidae","trend":{"2017":47,"2018":46,"2019":48,"2020":null,"2021":79,"2022":31},"total":251},{"name":"Corvidae","trend":{"2017":38,"2018":37,"2019":70,"2020":null,"2021":70,"2022":23},"total":238},{"name":"Fringillidae","trend":{"2017":22,"2018":22,"2019":103,"2020":null,"2021":57,"2022":17},"total":221},{"name":"Vireonidae","trend":{"2017":22,"2018":30,"2019":123,"2020":null,"2021":16,"2022":8},"total":199},{"name":"Bombycillidae","trend":{"2017":4,"2018":15,"2019":88,"2020":null,"2021":3,"2022":13},"total":123},{"name":"Strigidae","trend":{"2017":5,"2018":0,"2019":104,"2020":null,"2021":9,"2022":5},"total":123},{"name":"Accipitridae","trend":{"2017":7,"2018":0,"2019":88,"2020":null,"2021":3,"2022":0},"total":98},{"name":"Paridae","trend":{"2017":19,"2018":2,"2019":31,"2020":null,"2021":21,"2022":20},"total":93},{"name":"Certhiidae","trend":{"2017":1,"2018":8,"2019":30,"2020":null,"2021":9,"2022":12},"total":60},{"name":"Sittidae","trend":{"2017":2,"2018":2,"2019":26,"2020":null,"2021":6,"2022":3},"total":39},{"name":"Regulidae","trend":{"2017":1,"2018":10,"2019":0,"2020":null,"2021":7,"2022":13},"total":31},{"name":"Trochilidae","trend":{"2017":6,"2018":12,"2019":7,"2020":null,"2021":0,"2022":5},"total":30},{"name":"Hirundinidae","trend":{"2017":0,"2018":12,"2019":0,"2020":null,"2021":0,"2022":0},"total":12},{"name":"Odontophoridae","trend":{"2017":0,"2018":0,"2019":1,"2020":null,"2021":5,"2022":6},"total":12},{"name":"Icteridae","trend":{"2017":0,"2018":0,"2019":3,"2020":null,"2021":0,"2022":6},"total":9},{"name":"Phasianidae","trend":{"2017":0,"2018":0,"2019":0,"2020":null,"2021":3,"2022":5},"total":8}]},{"id":"BARR","name":"Utqiaġvik (Barrow), AK","lat":71.281711,"lng":-156.650219,"species":[{"name":"Scolopacidae","trend":{"2017":566,"2018":399,"2019":1513,"2020":null,"2021":982,"2022":437},"total":3897},{"name":"Anatidae","trend":{"2017":470,"2018":274,"2019":372,"2020":null,"2021":327,"2022":221},"total":1664},{"name":"Calcariidae","trend":{"2017":208,"2018":143,"2019":345,"2020":null,"2021":293,"2022":358},"total":1347},{"name":"Laridae","trend":{"2017":115,"2018":259,"2019":103,"2020":null,"2021":86,"2022":55},"total":618},{"name":"Stercorariidae","trend":{"2017":64,"2018":67,"2019":107,"2020":null,"2021":64,"2022":44},"total":346},{"name":"Charadriidae","trend":{"2017":48,"2018":54,"2019":121,"2020":null,"2021":48,"2022":4},"total":275},{"name":"Gaviidae","trend":{"2017":21,"2018":36,"2019":23,"2020":null,"2021":39,"2022":0},"total":119},{"name":"Picidae","trend":{"2017":25,"2018":23,"2019":1,"2020":null,"2021":15,"2022":0},"total":64},{"name":"Corvidae","trend":{"2017":6,"2018":0,"2019":20,"2020":null,"2021":17,"2022":0},"total":43},{"name":"Strigidae","trend":{"2017":0,"2018":37,"2019":2,"2020":null,"2021":4,"2022":0},"total":43},{"name":"Fringillidae","trend":{"2017":16,"2018":0,"2019":0,"2020":null,"2021":6,"2022":0},"total":22},{"name":"Emberizidae","trend":{"2017":6,"2018":0,"2019":0,"2020":null,"2021":0,"2022":0},"total":6},{"name":"Gruidae","trend":{"2017":2,"2018":0,"2019":0,"2020":null,"2021":2,"2022":0},"total":4}]},{"id":"BART","name":"Bartlett Experimental Forest, NH","lat":44.063889,"lng":-71.287375,"species":[{"name":"Parulidae","trend":{"2017":353,"2018":433,"2019":1281,"2020":1159,"2021":1401,"2022":648},"total":5275},{"name":"Picidae","trend":{"2017":54,"2018":42,"2019":416,"2020":343,"2021":588,"2022":213},"total":1656},{"name":"Vireonidae","trend":{"2017":167,"2018":191,"2019":431,"2020":158,"2021":422,"2022":266},"total":1635},{"name":"Turdidae","trend":{"2017":58,"2018":126,"2019":135,"2020":261,"2021":752,"2022":124},"total":1456},{"name":"Corvidae","trend":{"2017":17,"2018":24,"2019":393,"2020":32,"2021":323,"2022":44},"total":833},{"name":"Paridae","trend":{"2017":29,"2018":28,"2019":119,"2020":115,"2021":269,"2022":65},"total":625},{"name":"Cardinalidae","trend":{"2017":9,"2018":24,"2019":92,"2020":20,"2021":309,"2022":104},"total":558},{"name":"Sittidae","trend":{"2017":2,"2018":11,"2019":95,"2020":64,"2021":145,"2022":90},"total":407},{"name":"Troglodytidae","trend":{"2017":35,"2018":29,"2019":37,"2020":27,"2021":151,"2022":48},"total":327},{"name":"Fringillidae","trend":{"2017":0,"2018":0,"2019":0,"2020":100,"2021":181,"2022":2},"total":283},{"name":"Regulidae","trend":{"2017":14,"2018":14,"2019":21,"2020":26,"2021":31,"2022":90},"total":196},{"name":"Certhiidae","trend":{"2017":3,"2018":12,"2019":7,"2020":24,"2021":126,"2022":6},"total":178},{"name":"Accipitridae","trend":{"2017":0,"2018":0,"2019":92,"2020":22,"2021":15,"2022":6},"total":135},{"name":"Trochilidae","trend":{"2017":10,"2018":0,"2019":0,"2020":6,"2021":88,"2022":0},"total":104},{"name":"Strigidae","trend":{"2017":0,"2018":3,"2019":88,"2020":0,"2021":8,"2022":0},"total":99},{"name":"Alcedinidae","trend":{"2017":0,"2018":0,"2019":0,"2020":0,"2021":94,"2022":0},"total":94},{"name":"Phasianidae","trend":{"2017":0,"2018":3,"2019":0,"2020":0,"2021":88,"2022":0},"total":91},{"name":"Tyrannidae","trend":{"2017":5,"2018":13,"2019":9,"2020":5,"2021":21,"2022":16},"total":69},{"name":"Bombycillidae","trend":{"2017":0,"2018":0,"2019":10,"2020":8,"2021":4,"2022":0},"total":22},{"name":"Cuculidae","trend":{"2017":0,"2018":0,"2019":0,"2020":3,"2021":6,"2022":7},"total":16},{"name":"Emberizidae","trend":{"2017":2,"2018":0,"2019":0,"2020":0,"2021":5,"2022":9},"total":16},{"name":"Columbidae","trend":{"2017":0,"2018":1,"2019":0,"2020":0,"2021":2,"2022":3},"total":6},{"name":"Icteridae","trend":{"2017":0,"2018":0,"2019":4,"2020":0,"2021":0,"2022":0},"total":4},{"name":"Apodidae","trend":{"2017":0,"2018":2,"2019":0,"2020":0,"2021":0,"2022":0},"total":2}]},{"id":"DSNY","name":"Disney Wilderness Preserve, FL","lat":28.1251,"lng":-81.4362,"species":[{"name":"Emberizidae","trend":{"2017":356,"2018":534,"2019":397,"2020":null,"2021":391,"2022":406},"total":2084},{"name":"Picidae","trend":{"2017":315,"2018":260,"2019":176,"2020":null,"2021":307,"2022":415},"total":1473},{"name":"Columbidae","trend":{"2017":215,"2018":241,"2019":289,"2020":null,"2021":202,"2022":274},"total":1221},{"name":"Parulidae","trend":{"2017":245,"2018":185,"2019":219,"2020":null,"2021":265,"2022":197},"total":1111},{"name":"Icteridae","trend":{"2017":194,"2018":191,"2019":233,"2020":null,"2021":143,"2022":119},"total":880},{"name":"Troglodytidae","trend":{"2017":119,"2018":133,"2019":128,"2020":null,"2021":105,"2022":188},"total":673},{"name":"Tyrannidae","trend":{"2017":96,"2018":157,"2019":135,"2020":null,"2021":186,"2022":87},"total":661},{"name":"Odontophoridae","trend":{"2017":91,"2018":23,"2019":212,"2020":null,"2021":57,"2022":72},"total":455},{"name":"Cardinalidae","trend":{"2017":130,"2018":63,"2019":89,"2020":null,"2021":53,"2022":105},"total":440},{"name":"Corvidae","trend":{"2017":74,"2018":94,"2019":87,"2020":null,"2021":74,"2022":79},"total":408},{"name":"Accipitridae","trend":{"2017":30,"2018":112,"2019":61,"2020":null,"2021":77,"2022":115},"total":395},{"name":"Mimidae","trend":{"2017":109,"2018":111,"2019":100,"2020":null,"2021":45,"2022":0},"total":365},{"name":"Turdidae","trend":{"2017":44,"2018":63,"2019":85,"2020":null,"2021":60,"2022":64},"total":316},{"name":"Vireonidae","trend":{"2017":105,"2018":65,"2019":60,"2020":null,"2021":46,"2022":34},"total":310},{"name":"Caprimulgidae","trend":{"2017":12,"2018":117,"2019":58,"2020":null,"2021":39,"2022":47},"total":273},{"name":"Paridae","trend":{"2017":65,"2018":32,"2019":47,"2020":null,"2021":23,"2022":72},"total":239},{"name":"Sittidae","trend":{"2017":7,"2018":7,"2019":16,"2020":null,"2021":29,"2022":109},"total":168},{"name":"Strigidae","trend":{"2017":6,"2018":108,"2019":21,"2020":null,"2021":13,"2022":12},"total":160},{"name":"Cathartidae","trend":{"2017":40,"2018":14,"2019":12,"2020":null,"2021":53,"2022":4},"total":123},{"name":"Phasianidae","trend":{"2017":4,"2018":0,"2019":88,"2020":null,"2021":12,"2022":8},"total":112},{"name":"Threskiornithidae","trend":{"2017":0,"2018":93,"2019":1,"2020":null,"2021":0,"2022":0},"total":94},{"name":"Passeridae","trend":{"2017":0,"2018":88,"2019":0,"2020":null,"2021":0,"2022":0},"total":88},{"name":"Hirundinidae","trend":{"2017":44,"2018":0,"2019":4,"2020":null,"2021":23,"2022":0},"total":71},{"name":"Gruidae","trend":{"2017":1,"2018":10,"2019":11,"2020":null,"2021":23,"2022":6},"total":51},{"name":"Ardeidae","trend":{"2017":15,"2018":5,"2019":20,"2020":null,"2021":0,"2022":6},"total":46},{"name":"Anatidae","trend":{"2017":6,"2018":3,"2019":23,"2020":null,"2021":9,"2022":0},"total":41},{"name":"Charadriidae","trend":{"2017":10,"2018":6,"2019":2,"2020":null,"2021":12,"2022":0},"total":30},{"name":"Polioptilidae","trend":{"2017":0,"2018":0,"2019":0,"2020":null,"2021":19,"2022":4},"total":23},{"name":"Laniidae","trend":{"2017":6,"2018":0,"2019":6,"2020":null,"2021":5,"2022":4},"total":21},{"name":"Pandionidae","trend":{"2017":8,"2018":0,"2019":0,"2020":null,"2021":6,"2022":1},"total":15},{"name":"Anhingidae","trend":{"2017":0,"2018":0,"2019":0,"2020":null,"2021":3,"2022":0},"total":3},{"name":"Cuculidae","trend":{"2017":2,"2018":0,"2019":0,"2020":null,"2021":0,"2022":0},"total":2},{"name":"Falconidae","trend":{"2017":1,"2018":0,"2019":0,"2020":null,"2021":0,"2022":0},"total":1}]},{"id":"LAJA","name":"Lajas Experimental Station, PR","lat":18.0212,"lng":-67.0769,"species":[{"name":"Columbidae","trend":{"2017":579,"2018":415,"2019":221,"2020":406,"2021":457,"2022":48},"total":2126},{"name":"Thraupidae","trend":{"2017":463,"2018":295,"2019":151,"2020":251,"2021":202,"2022":35},"total":1397},{"name":"Tyrannidae","trend":{"2017":312,"2018":184,"2019":129,"2020":227,"2021":209,"2022":31},"total":1092},{"name":"Ploceidae","trend":{"2017":273,"2018":176,"2019":80,"2020":106,"2021":169,"2022":28},"total":832},{"name":"Icteridae","trend":{"2017":182,"2018":155,"2019":120,"2020":164,"2021":109,"2022":43},"total":773},{"name":"Ardeidae","trend":{"2017":209,"2018":119,"2019":78,"2020":198,"2021":117,"2022":48},"total":769},{"name":"Mimidae","trend":{"2017":178,"2018":130,"2019":82,"2020":78,"2021":117,"2022":41},"total":626},{"name":"Cathartidae","trend":{"2017":121,"2018":161,"2019":28,"2020":104,"2021":119,"2022":33},"total":566},{"name":"Emberizidae","trend":{"2017":126,"2018":105,"2019":50,"2020":58,"2021":134,"2022":2},"total":475},{"name":"Cuculidae","trend":{"2017":115,"2018":49,"2019":41,"2020":134,"2021":61,"2022":5},"total":405},{"name":"Estrildidae","trend":{"2017":193,"2018":57,"2019":25,"2020":61,"2021":19,"2022":14},"total":369},{"name":"Passeridae","trend":{"2017":51,"2018":80,"2019":81,"2020":54,"2021":51,"2022":30},"total":347},{"name":"Picidae","trend":{"2017":73,"2018":15,"2019":23,"2020":58,"2021":67,"2022":5},"total":241},{"name":"Charadriidae","trend":{"2017":36,"2018":36,"2019":21,"2020":54,"2021":36,"2022":6},"total":189},{"name":"Psittacidae","trend":{"2017":66,"2018":37,"2019":2,"2020":20,"2021":25,"2022":23},"total":173},{"name":"Threskiornithidae","trend":{"2017":32,"2018":8,"2019":34,"2020":21,"2021":27,"2022":12},"total":134},{"name":"Phasianidae","trend":{"2017":0,"2018":3,"2019":16,"2020":46,"2021":42,"2022":24},"total":131},{"name":"Vireonidae","trend":{"2017":73,"2018":24,"2019":19,"2020":0,"2021":4,"2022":4},"total":124},{"name":"Viduidae","trend":{"2017":25,"2018":0,"2019":12,"2020":49,"2021":30,"2022":6},"total":122},{"name":"Accipitridae","trend":{"2017":17,"2018":3,"2019":17,"2020":29,"2021":15,"2022":3},"total":84},{"name":"Recurvirostridae","trend":{"2017":15,"2018":38,"2019":9,"2020":9,"2021":4,"2022":1},"total":76},{"name":"Parulidae","trend":{"2017":30,"2018":7,"2019":3,"2020":8,"2021":17,"2022":0},"total":65},{"name":"Hirundinidae","trend":{"2017":39,"2018":11,"2019":0,"2020":6,"2021":6,"2022":0},"total":62},{"name":"Trochilidae","trend":{"2017":12,"2018":0,"2019":29,"2020":12,"2021":0,"2022":0},"total":53},{"name":"Rallidae","trend":{"2017":18,"2018":17,"2019":0,"2020":0,"2021":0,"2022":0},"total":35},{"name":"Numididae","trend":{"2017":0,"2018":0,"2019":0,"2020":0,"2021":23,"2022":5},"total":28},{"name":"Falconidae","trend":{"2017":11,"2018":0,"2019":0,"2020":0,"2021":7,"2022":0},"total":18},{"name":"Anatidae","trend":{"2017":12,"2018":0,"2019":2,"2020":0,"2021":2,"2022":0},"total":16},{"name":"Podicipedidae","trend":{"2017":6,"2018":0,"2019":0,"2020":0,"2021":0,"2022":0},"total":6},{"name":"Turdidae","trend":{"2017":0,"2018":0,"2019":0,"2020":0,"2021":6,"2022":0},"total":6},{"name":"Pandionidae","trend":{"2017":0,"2018":0,"2019":5,"2020":0,"2021":0,"2022":0},"total":5},{"name":"Fregatidae","trend":{"2017":0,"2018":0,"2019":0,"2020":0,"2021":4,"2022":0},"total":4},{"name":"Caprimulgidae","trend":{"2017":3,"2018":0,"2019":0,"2020":0,"2021":0,"2022":0},"total":3},{"name":"Cardinalidae","trend":{"2017":0,"2018":0,"2019":0,"2020":0,"2021":2,"2022":0},"total":2},{"name":"Scolopacidae","trend":{"2017":1,"2018":1,"2019":0,"2020":0,"2021":0,"2022":0},"total":2},{"name":"Strigidae","trend":{"2017":0,"2018":2,"2019":0,"2020":0,"2021":0,"2022":0},"total":2}]},{"id":"TEAK","name":"Teakettle Creek, CA","lat":37.0058,"lng":-119.006,"species":[{"name":"Emberizidae","trend":{"2017":1051,"2018":771,"2019":868,"2020":null,"2021":861,"2022":1116},"total":4667},{"name":"Picidae","trend":{"2017":870,"2018":479,"2019":219,"2020":null,"2021":448,"2022":744},"total":2760},{"name":"Parulidae","trend":{"2017":581,"2018":452,"2019":438,"2020":null,"2021":533,"2022":703},"total":2707},{"name":"Sittidae","trend":{"2017":271,"2018":424,"2019":362,"2020":null,"2021":364,"2022":354},"total":1775},{"name":"Paridae","trend":{"2017":276,"2018":338,"2019":450,"2020":null,"2021":356,"2022":339},"total":1759},{"name":"Corvidae","trend":{"2017":451,"2018":331,"2019":200,"2020":null,"2021":331,"2022":441},"total":1754},{"name":"Turdidae","trend":{"2017":562,"2018":321,"2019":234,"2020":null,"2021":226,"2022":397},"total":1740},{"name":"Tyrannidae","trend":{"2017":389,"2018":345,"2019":383,"2020":null,"2021":202,"2022":294},"total":1613},{"name":"Cardinalidae","trend":{"2017":384,"2018":213,"2019":196,"2020":null,"2021":259,"2022":259},"total":1311},{"name":"Regulidae","trend":{"2017":214,"2018":283,"2019":204,"2020":null,"2021":208,"2022":223},"total":1132},{"name":"Fringillidae","trend":{"2017":148,"2018":192,"2019":69,"2020":null,"2021":106,"2022":291},"total":806},{"name":"Certhiidae","trend":{"2017":228,"2018":96,"2019":75,"2020":null,"2021":82,"2022":161},"total":642},{"name":"Odontophoridae","trend":{"2017":251,"2018":121,"2019":159,"2020":null,"2021":26,"2022":27},"total":584},{"name":"Vireonidae","trend":{"2017":25,"2018":25,"2019":53,"2020":null,"2021":16,"2022":118},"total":237},{"name":"Troglodytidae","trend":{"2017":43,"2018":108,"2019":3,"2020":null,"2021":14,"2022":16},"total":184},{"name":"Trochilidae","trend":{"2017":39,"2018":1,"2019":4,"2020":null,"2021":5,"2022":109},"total":158},{"name":"Columbidae","trend":{"2017":88,"2018":0,"2019":0,"2020":null,"2021":7,"2022":30},"total":125},{"name":"Cinclidae","trend":{"2017":0,"2018":0,"2019":0,"2020":null,"2021":88,"2022":0},"total":88},{"name":"Accipitridae","trend":{"2017":0,"2018":9,"2019":0,"2020":null,"2021":11,"2022":25},"total":45},{"name":"Icteridae","trend":{"2017":0,"2018":8,"2019":7,"2020":null,"2021":8,"2022":0},"total":23},{"name":"Apodidae","trend":{"2017":0,"2018":0,"2019":0,"2020":null,"2021":2,"2022":15},"total":17},{"name":"Phasianidae","trend":{"2017":1,"2018":0,"2019":0,"2020":null,"2021":3,"2022":0},"total":4},{"name":"Cathartidae","trend":{"2017":0,"2018":0,"2019":0,"2020":null,"2021":0,"2022":2},"total":2}]}];
+
+// ── DATA ──────────────────────────────────────────────────────────────
+let SITES = BIRDPOINT_DATA;
+let currentSite = null;
+let currentSpecies = null;
+let map = null;
+let chartInstance = null;
+const imageCache = {}; // family name → url or null
+let openaiKey = localStorage.getItem('birdpoint_ai_key') || null;
+
+const BIRD_EMOJIS = ['🐦','🦅','🦆','🦉','🦚','🦜','🦢','🐧','🦋','🕊️'];
+const getBirdEmoji = (name) => BIRD_EMOJIS[name.charCodeAt(0) % BIRD_EMOJIS.length];
+
+async function fetchBirdImage(familyName) {
+  if (familyName in imageCache) return imageCache[familyName];
+  imageCache[familyName] = null; // mark as in-flight
+  try {
+    const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(familyName)}`);
+    const data = await res.json();
+    imageCache[familyName] = data.thumbnail?.source || null;
+  } catch { imageCache[familyName] = null; }
+  return imageCache[familyName];
+}
+
+const COMMON_NAMES = {
+  Accipitridae:      "Hawks & Eagles",
+  Alcedinidae:       "Kingfishers",
+  Anatidae:          "Ducks, Geese & Swans",
+  Anhingidae:        "Anhingas",
+  Apodidae:          "Swifts",
+  Ardeidae:          "Herons & Egrets",
+  Bombycillidae:     "Waxwings",
+  Calcariidae:       "Longspurs & Snow Buntings",
+  Caprimulgidae:     "Nightjars & Whip-poor-wills",
+  Cardinalidae:      "Cardinals & Grosbeaks",
+  Cathartidae:       "New World Vultures",
+  Certhiidae:        "Treecreepers",
+  Charadriidae:      "Plovers",
+  Cinclidae:         "Dippers",
+  Columbidae:        "Pigeons & Doves",
+  Corvidae:          "Crows, Jays & Ravens",
+  Cuculidae:         "Cuckoos",
+  Emberizidae:       "Sparrows & Buntings",
+  Estrildidae:       "Waxbills & Munias",
+  Falconidae:        "Falcons",
+  Fregatidae:        "Frigatebirds",
+  Fringillidae:      "Finches",
+  Gaviidae:          "Loons",
+  Gruidae:           "Cranes",
+  Hirundinidae:      "Swallows & Martins",
+  Icteridae:         "Blackbirds & Orioles",
+  Laridae:           "Gulls & Terns",
+  Laniidae:          "Shrikes",
+  Mimidae:           "Mockingbirds & Thrashers",
+  Numididae:         "Guineafowl",
+  Odontophoridae:    "New World Quails",
+  Pandionidae:       "Osprey",
+  Paridae:           "Chickadees & Titmice",
+  Parulidae:         "New World Warblers",
+  Passeridae:        "Old World Sparrows",
+  Phasianidae:       "Pheasants & Turkeys",
+  Picidae:           "Woodpeckers",
+  Ploceidae:         "Weavers",
+  Podicipedidae:     "Grebes",
+  Polioptilidae:     "Gnatcatchers",
+  Psittacidae:       "Parrots",
+  Rallidae:          "Rails & Coots",
+  Recurvirostridae:  "Stilts & Avocets",
+  Regulidae:         "Kinglets",
+  Scolopacidae:      "Sandpipers & Allies",
+  Sittidae:          "Nuthatches",
+  Stercorariidae:    "Jaegers & Skuas",
+  Strigidae:         "Owls",
+  Thraupidae:        "Tanagers",
+  Threskiornithidae: "Ibises & Spoonbills",
+  Trochilidae:       "Hummingbirds",
+  Troglodytidae:     "Wrens",
+  Turdidae:          "Thrushes",
+  Tyrannidae:        "Tyrant Flycatchers",
+  Viduidae:          "Indigobirds & Whydahs",
+  Vireonidae:        "Vireos",
+};
+
+function getCommonName(family) {
+  return COMMON_NAMES[family] || family;
+}
+
+const SPECIES_INTROS = {
+  Parulidae:        "New World warblers are among North America's most colorful songbirds. These small, energetic birds migrate thousands of miles each year between tropical wintering grounds and North American breeding sites. Their numbers are a sensitive indicator of forest health and insect availability.",
+  Emberizidae:      "Sparrows and buntings are ground-foraging seed-eaters found across nearly every North American habitat. Though often overlooked, they play a key role in dispersing seeds and supporting food webs as prey for hawks and owls. Their populations reflect the health of grasslands and shrublands.",
+  Cardinalidae:     "Cardinals, grosbeaks, and their relatives are known for their thick, powerful bills built for cracking hard seeds. Males are often brilliantly colored — the Northern Cardinal's red plumage is one of the most recognized sights at backyard feeders. They also consume insects and fruit, making them versatile foragers.",
+  Turdidae:         "Thrushes are celebrated for some of the most beautiful songs in the bird world — the Hermit Thrush's flutelike melody echoes through forests at dusk. Robins, bluebirds, and Swainson's thrushes are all members of this family. They eat a mix of earthworms, berries, and insects, often signaling seasonal change by their arrival or departure.",
+  Tyrannidae:       "Tyrant flycatchers are the largest bird family in the Western Hemisphere, with over 400 species. They hunt insects with precision, launching from a perch and snapping prey mid-air. Their aggressive defense of nesting territory — even against much larger birds — earned them the \"tyrant\" name.",
+  Picidae:          "Woodpeckers are nature's tree surgeons, excavating cavities that dozens of other species depend on for nesting and shelter. Their reinforced skulls and shock-absorbing anatomy protect their brains while they drum at up to 20 pecks per second. Beyond insects, many also eat berries, nuts, and tree sap.",
+  Columbidae:       "Pigeons and doves are among the world's most widespread birds, found on every continent except Antarctica. They are fast, powerful fliers capable of navigating hundreds of miles. Their soft cooing calls and gentle demeanor have made them symbols of peace across many cultures.",
+  Troglodytidae:    "Wrens pack an outsized voice into a tiny body — the tiny Winter Wren can be heard from over half a mile away. They are secretive birds of dense undergrowth, thickets, and forest edges, where they forage restlessly for insects and spiders. Their complex, bubbling songs are a sign of healthy shrub habitat.",
+  Corvidae:         "Crows, jays, and ravens are among the most intelligent animals on Earth. They use tools, recognize individual human faces, plan for the future, and solve multi-step puzzles. Their adaptability has made them successful in habitats from deep wilderness to city centers, where they serve as both scavengers and seed dispersers.",
+  Fringillidae:     "True finches are specialized seed-eaters with bills fine-tuned to specific food sources — crossbills can pry open tightly sealed pine cones that no other bird can access. Goldfinches delay nesting until thistles go to seed so their chicks can be fed entirely on seeds. Their irruptive migrations track food availability across vast landscapes.",
+  Vireonidae:       "Vireos are methodical, deliberate foragers that pick insects carefully from leaves and bark — a contrast to the frantic searching of warblers. Their persistent, repetitive songs are a constant backdrop in North American forests all summer. Despite their drab olive-and-gray coloring, they are important insect controllers in forest canopies.",
+  Bombycillidae:    "Waxwings are nomadic fruit specialists that move in tight, fast-flying flocks wherever berries are abundant. Cedar Waxwings are famous for passing fruit down a perched line of birds — a rare example of food-sharing behavior. Their silky plumage and bright red wax-tipped feathers make them easy to identify.",
+  Strigidae:        "Typical owls are masters of silent, nighttime hunting. Specialized feathers muffle the sound of their wingbeats to near-silence, and asymmetrically placed ears let them pinpoint prey under snow by sound alone. As top predators of the night, their population trends reflect the health of the entire food web below them.",
+  Accipitridae:     "Hawks, eagles, and kites are the daytime raptors that anchor forest and grassland food webs. Red-tailed Hawks patrol open country; Cooper's Hawks thread through forest understories; Bald Eagles anchor aquatic ecosystems. Declines in this family's numbers are often the first sign of ecosystem imbalance.",
+  Paridae:          "Chickadees and titmice are year-round residents in North American forests, forming the social core of mixed-species winter flocks. Chickadees cache thousands of individual food items and can remember each hiding spot months later. Their distinctive calls serve as an alarm system for dozens of other species.",
+  Certhiidae:       "Brown Creepers are masters of camouflage — their brown-streaked plumage makes them nearly invisible against tree bark. They always spiral upward from the base of a trunk, probing crevices for hidden insects, then fly to the base of the next tree to start again. They are a reliable indicator of mature forest stands.",
+  Sittidae:         "Nuthatches are the only birds that routinely walk headfirst down tree trunks, giving them access to insects hidden in bark that other species miss. They wedge large seeds into bark crevices and hack them open — hence \"nut-hack.\" Their nasal calls are a familiar sound in mixed forests year-round.",
+  Regulidae:        "Kinglets are among the smallest birds in North America, yet they survive arctic winters in forest canopies. Ruby-crowned Kinglets can beat their wings up to 50 times per second and must eat almost continuously to fuel their tiny bodies in cold weather. Their nervous wing-flicking is a quick field identification clue.",
+  Trochilidae:      "Hummingbirds are the only birds capable of sustained hovering and of flying backwards. Their hearts can beat over 1,200 times per minute in flight, and they enter a state of nightly torpor to conserve energy. As pollinators of hundreds of plant species, their presence or absence shapes entire plant communities.",
+  Hirundinidae:     "Swallows and martins are aerial acrobats that catch every insect they eat on the wing. A single Barn Swallow can consume 850 insects per day. They are among the first signs of spring migration and are sensitive to insect declines — making their population trends an important proxy for ecosystem health.",
+  Odontophoridae:   "New World quails are plump, ground-dwelling birds that rarely fly unless startled. They forage in coveys, scratching through leaf litter for seeds, berries, and insects. The iconic call of the Northern Bobwhite — a clear, whistled \"bob-WHITE\" — has become increasingly rare as grassland habitats have declined.",
+  Icteridae:        "Blackbirds, orioles, meadowlarks, and grackles form a diverse family adapted to habitats from marshes to tropics. Red-winged Blackbirds are among the most abundant North American birds; Baltimore Orioles weave intricate hanging nests; Bobolinks migrate over 12,000 miles round-trip from the Canadian prairies to Argentina.",
+  Phasianidae:      "Pheasants, grouse, and wild turkeys are heavy-bodied, ground-dwelling birds that forage for seeds, berries, and insects in open woods and grasslands. Wild Turkeys were nearly hunted to extinction by the early 1900s but rebounded dramatically thanks to conservation efforts — one of North America's great wildlife recovery stories.",
+  Scolopacidae:     "Sandpipers and their allies include some of the world's greatest long-distance migrants — Bar-tailed Godwits fly nonstop from Alaska to New Zealand, over 7,000 miles. Their long, sensitive bills probe mud and sand for invertebrates at remarkable speed. Shorebird populations are critical indicators of wetland and mudflat health.",
+  Anatidae:         "Ducks, geese, and swans have been intertwined with human civilization for millennia. Mallards are the world's most abundant duck; Canada Geese are famously adaptable; Tundra Swans migrate from the Gulf Coast to the Arctic each spring. Waterfowl populations closely track the health of wetland ecosystems.",
+  Calcariidae:      "Longspurs and snow buntings breed in the harshest environments on Earth — open Arctic tundra where they nest in lemmings' abandoned burrows or beneath rocks. In winter, they form massive flocks that sweep across snow-covered fields. Lapland Longspurs are among the most numerous birds in North America despite being rarely seen.",
+  Laridae:          "Gulls are highly intelligent, opportunistic birds capable of learning to drop shellfish onto pavement to crack them open. Terns are elegant plunge-divers that hover over water before striking. Both are important indicators of coastal ecosystem health and are often the first birds affected by marine pollution.",
+  Stercorariidae:   "Jaegers and skuas are the pirates of the seabird world — they chase other birds in flight and force them to drop their catch. They are powerful, aggressive fliers that breed on open Arctic tundra and spend winters far out to sea. Their populations are closely tied to the health of Arctic-nesting shorebirds and lemmings.",
+  Charadriidae:     "Plovers use a distinctive run-stop-tilt foraging technique, sprinting across open ground and pausing to scan for movement before snatching insects or worms. Many species nest directly on the ground, relying on camouflage for protection. They perform elaborate broken-wing displays to lure predators away from eggs.",
+  Gaviidae:         "Loons are built for diving — their bones are denser than those of most birds, helping them sink quickly to catch fish. They are powerful underwater swimmers but awkward on land, coming ashore only to nest. The haunting wail of a Common Loon echoing across a northern lake has become an icon of wilderness.",
+  Gruidae:          "Cranes are among the world's tallest flying birds, standing up to 5 feet tall. Their elaborate courtship dances — bowing, leaping, and tossing grass into the air — are among the most spectacular behaviors in the bird world. Many crane species are endangered, and their recovery is a major focus of international conservation.",
+  Alcedinidae:      "Kingfishers are precision hunters that hover above water, then plunge headfirst to catch fish with their dagger-like bills. The Belted Kingfisher — the only widespread species in North America — is one of the few bird species where the female is more colorful than the male. Their presence signals clean, fish-bearing water.",
+  Cuculidae:        "Cuckoos are known for brood parasitism — some species lay their eggs in other birds' nests, leaving the foster parents to raise their chick. In North America, Yellow-billed and Black-billed Cuckoos are voracious caterpillar hunters, particularly during outbreaks of tent caterpillars. Their calls are a classic sound of eastern forests.",
+  Apodidae:         "Swifts are so perfectly adapted to aerial life that they eat, drink, mate, and even sleep on the wing — some species spend up to ten months without landing. Their feet are almost useless for walking but grip vertical surfaces powerfully for roosting in chimneys and cliff faces. They are among the fastest birds in level flight.",
+  Thraupidae:       "Tanagers are among the most colorful birds in the New World, with brilliant plumages of red, yellow, blue, and green. In Puerto Rico and the Caribbean, this family includes many resident species that depend on tropical forest and agricultural habitats. They are key fruit dispersers, swallowing seeds whole and depositing them far from parent plants.",
+  Ploceidae:        "Weavers are named for their extraordinary woven nests, often suspended from branch tips over water to deter predators. Originally from Africa and Asia, several species now breed in Puerto Rico and other Caribbean islands. Village Weavers form noisy, highly social colonies and can build hundreds of nests in a single tree.",
+  Ardeidae:         "Herons and egrets are patient, stand-and-strike hunters that can remain motionless for minutes before exploding into action to spear fish. Great Blue Herons are the largest North American herons, standing nearly 4 feet tall. Egret populations famously crashed in the 1800s due to feather hunting before becoming a catalyst for the modern conservation movement.",
+  Cathartidae:      "New World vultures are nature's cleanup crew, soaring on thermals for hours while scanning for carrion. Turkey Vultures have an extraordinary sense of smell — rare among birds — and can detect a carcass hidden beneath forest canopy. By rapidly consuming dead animals, vultures prevent the spread of diseases like anthrax and botulism.",
+  Mimidae:          "Mockingbirds, thrashers, and catbirds are North America's premier vocal mimics. A Northern Mockingbird can incorporate over 200 different song types into its repertoire, including the calls of other species, frog calls, and even mechanical sounds. Males may sing throughout the night during breeding season.",
+  Caprimulgidae:    "Nightjars are masters of camouflage and darkness, resting motionless on the ground during the day and hunting insects by night. The Eastern Whip-poor-will repeats its own name hundreds of times in a single session. Their populations have declined sharply in recent decades, likely due to insect declines linked to pesticide use and light pollution.",
+  Threskiornithidae:"Ibises probe mud and shallow water with their long, sensitive, down-curved bills, finding prey by touch rather than sight. White Ibises are a common sight in Florida wetlands, where they forage in noisy flocks. They are important in controlling aquatic invertebrate populations and are sensitive indicators of wetland quality.",
+  Passeridae:       "House Sparrows were introduced to North America from Europe in the 1850s and are now one of the most abundant birds on Earth. Closely tied to human settlements, they nest in building crevices, signs, and vines. Their success in urban environments has made them a useful species for studying how birds adapt to human-modified landscapes.",
+  Polioptilidae:    "Gnatcatchers are tiny, restless birds that flit through shrubs and forest edges in constant motion, flicking their long tails. The Blue-gray Gnatcatcher is barely 4 inches long yet migrates hundreds of miles between its wintering and breeding grounds. Their thin, wheezy calls and active behavior make them easy to notice despite their small size.",
+  Laniidae:         "Shrikes are sometimes called \"butcher birds\" for their habit of impaling prey — insects, lizards, mice, and small birds — on thorns or barbed wire to cache for later. Despite looking like songbirds, they are predatory hunters with hooked bills. Loggerhead Shrike populations have declined steeply and it is now a species of conservation concern.",
+  Pandionidae:      "The Osprey is one of the world's most widespread birds of prey and the only raptor that plunges feet-first into water to catch fish. Reversible outer toes and spiny foot pads help grip slippery fish. Nearly wiped out by DDT in the mid-20th century, Ospreys rebounded dramatically after the pesticide was banned — an iconic conservation success.",
+  Anhingidae:       "Anhingas swim underwater and spear fish with their sharp bills, but unlike ducks, their feathers are not waterproof. After diving, they must perch with wings spread wide to dry in the sun — a distinctive silhouette. This trait allows them to be less buoyant underwater, making them more effective hunters in Florida and Gulf Coast waterways.",
+  Falconidae:       "Falcons are built for speed — the Peregrine Falcon is the fastest animal on Earth, reaching over 240 mph in a hunting stoop. They hunt primarily by sight and are often found near cliffs, tall buildings, or open ground. Peregrines were nearly extinct due to DDT contamination but have since recovered to historic levels in many areas.",
+  Psittacidae:      "Parrots are among the most intelligent birds, capable of learning human speech, using simple tools, and solving complex puzzles. Puerto Rico's endemic Puerto Rican Parrot was reduced to just 13 wild individuals in 1975 and is still critically endangered despite intensive recovery efforts. Their survival is closely tied to native Caribbean forest.",
+  Viduidae:         "Indigobirds and whydahs are brood parasites — females lay their eggs exclusively in the nests of specific waxbill species. Their chicks mimic the host's gape pattern perfectly, fooling the foster parents into feeding them. Males of pin-tailed species grow dramatically elongated tail feathers during breeding season.",
+  Estrildidae:      "Waxbills and munias are small, social seed-eaters originally from Africa and Asia, now established in several parts of the world through accidental or intentional release. Common Waxbills form tight, noisy flocks and are often seen clinging to grass stems. Several species have become naturalized in Puerto Rico and the Caribbean.",
+  Recurvirostridae: "Stilts and avocets are elegant wading birds with long, colorful legs that let them wade into deeper water than most shorebirds. American Avocets sweep their upturned bills side to side through shallow water to catch invertebrates. They nest in loose colonies on open mudflats and are vulnerable to water level changes and human disturbance.",
+  Rallidae:         "Rails, coots, and gallinules are secretive marsh birds more often heard than seen. The expression \"thin as a rail\" comes from their laterally flattened bodies, which let them slip between dense cattail stems. Coots are more visible, often seen swimming in open water, and are surprisingly aggressive toward other birds.",
+  Numididae:        "Guineafowl are large, gregarious ground birds from Africa, introduced to several parts of the Caribbean. They move in noisy, fast-walking flocks and produce loud, harsh alarm calls that warn other wildlife of approaching predators. Their constant foraging through leaf litter can significantly reduce tick and insect populations.",
+  Podicipedidae:    "Grebes are expert diving birds that feed almost entirely underwater. They are well known for elaborate courtship rituals — Western Grebes perform a dramatic \"rushing\" display in which a pair runs across the water surface side by side. Unusually, grebes regularly eat their own feathers, which may help protect them from sharp fish bones.",
+  Fregatidae:       "Frigatebirds have the largest wingspan relative to body weight of any bird, allowing them to soar effortlessly for weeks over the open ocean. They are notorious for stealing food directly from other seabirds in flight. Male Magnificent Frigatebirds inflate a bright red throat pouch the size of a balloon during courtship displays.",
+  Cinclidae:        "Dippers are the world's only truly aquatic songbirds. They walk along the bottoms of fast-moving mountain streams, using their wings to \"fly\" underwater while hunting aquatic insects and small fish. Their presence is a reliable indicator of clean, cold, well-oxygenated water — they disappear quickly when streams are polluted.",
+};
+
+function getSpeciesIntro(name, siteName) {
+  return SPECIES_INTROS[name] ||
+    `${name} is a bird family recorded at the ${siteName} NEON monitoring site. Population counts were collected annually from 2017 to 2022 as part of the National Ecological Observatory Network's breeding landbird survey.`;
+}
+
+const AI_SUGGESTIONS = {
+  default: (name) => `
+    <ul>
+      <li>Support local habitat restoration efforts that benefit ${name} and related species.</li>
+      <li>Reduce pesticide use near foraging and nesting areas.</li>
+      <li>Log your sightings to contribute to population tracking data.</li>
+      <li>Share population trend data with local conservation groups or rangers.</li>
+    </ul>`
+};
+
+// ── SCREEN NAVIGATION ─────────────────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if (id === 'map-screen' && !map) initMap();
+}
+
+function showMap() {
+  showScreen('map-screen');
+  if (map) setTimeout(() => map.resize(), 50);
+  else setTimeout(initMap, 50);
+}
+
+function showLog() {
+  showScreen('log-screen');
+  // Populate location dropdown
+  const sel = document.getElementById('log-location');
+  sel.innerHTML = '<option value="">Select a site...</option>';
+  SITES.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s.id;
+    opt.textContent = `${s.id} — ${s.name}`;
+    sel.appendChild(opt);
+  });
+}
+
+// ── MAP ───────────────────────────────────────────────────────────────
+function initMap() {
+  if (map) return;
+  map = new maplibregl.Map({
+    container: 'map',
+    style: 'https://tiles.openfreemap.org/styles/liberty',
+    center: [-98, 38],
+    zoom: 3
+  });
+
+  map.addControl(new maplibregl.NavigationControl(), 'bottom-right');
+
+  map.on('load', () => {
+    SITES.forEach(site => {
+      const el = document.createElement('div');
+      el.style.cssText = `cursor:pointer;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.35));`;
+      el.innerHTML = `<svg width="28" height="38" viewBox="0 0 28 38" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M14 0C6.27 0 0 6.27 0 14c0 10.5 14 24 14 24S28 24.5 28 14C28 6.27 21.73 0 14 0z" fill="#2d5a3d"/>
+        <path d="M14 1C6.82 1 1 6.82 1 14c0 10 13 23 13 23S27 24 27 14C27 6.82 21.18 1 14 1z" fill="#2d5a3d"/>
+        <circle cx="14" cy="14" r="5.5" fill="white"/>
+        <circle cx="14" cy="14" r="3" fill="#2d5a3d"/>
+      </svg>`;
+      el.title = site.name;
+      el.addEventListener('click', () => openLocation(site));
+
+      new maplibregl.Marker({ element: el })
+        .setLngLat([site.lng, site.lat])
+        .addTo(map);
+    });
+  });
+}
+
+// ── MAP SEARCH ────────────────────────────────────────────────────────
+function searchLocations() {
+  const q = document.getElementById('map-search-input').value.toLowerCase().trim();
+  const drop = document.getElementById('search-drop');
+  if (!q) { drop.style.display = 'none'; return; }
+
+  const matches = SITES.filter(s =>
+    s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q)
+  );
+
+  if (!matches.length) {
+    drop.innerHTML = '<div style="padding:0.75rem 1rem;font-size:0.9rem;color:#999;">No locations found</div>';
+  } else {
+    drop.innerHTML = matches.map(s => `
+      <div onclick="selectLocation('${s.id}')"
+        style="padding:0.75rem 1rem;cursor:pointer;font-size:0.9rem;border-bottom:1px solid #f5f5f5;display:flex;gap:0.5rem;align-items:center;">
+        <span>📍</span>
+        <div>
+          <div style="font-weight:600;">${s.name}</div>
+          <div style="font-size:0.75rem;color:#888;">NEON ${s.id}</div>
+        </div>
+      </div>`).join('');
+  }
+  drop.style.display = 'block';
+}
+
+function selectLocation(id) {
+  const site = SITES.find(s => s.id === id);
+  if (!site) return;
+  closeSearchDrop();
+  document.getElementById('map-search-input').value = site.name;
+  map.flyTo({ center: [site.lng, site.lat], zoom: 7, duration: 800 });
+  setTimeout(() => openLocation(site), 900);
+}
+
+function closeSearchDrop() {
+  document.getElementById('search-drop').style.display = 'none';
+}
+
+// ── LOCATION DETAIL ───────────────────────────────────────────────────
+function openLocation(site) {
+  currentSite = site;
+  document.getElementById('location-name').textContent = site.name;
+  document.getElementById('location-meta').textContent =
+    `📍 NEON Site ${site.id} · ${site.lat.toFixed(4)}, ${site.lng.toFixed(4)} · ${site.species.length} families recorded`;
+  document.getElementById('species-search').value = '';
+  renderSpeciesList(site.species);
+  openPanel('location-panel');
+}
+
+function renderSpeciesList(species) {
+  const list = document.getElementById('species-list');
+  if (!species.length) {
+    list.innerHTML = '<p class="no-results">No species found.</p>';
+    return;
+  }
+  list.innerHTML = species.map((sp, i) => `
+    <div class="species-item" onclick="openSpecies('${sp.name}')">
+      <div class="species-icon" id="sicon-${i}">${getBirdEmoji(sp.name)}</div>
+      <div>
+        <div class="species-name">${getCommonName(sp.name)}</div>
+        <div class="species-sci">${sp.name}</div>
+        <div class="species-count">${sp.total.toLocaleString()} total observations (2017–2022)</div>
+      </div>
+    </div>`).join('');
+
+  // Swap emojis for real photos as they load
+  species.forEach((sp, i) => {
+    fetchBirdImage(sp.name).then(url => {
+      const el = document.getElementById(`sicon-${i}`);
+      if (url && el) el.innerHTML =
+        `<img src="${url}" alt="${sp.name}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">`;
+    });
+  });
+}
+
+function filterSpecies() {
+  if (!currentSite) return;
+  const q = document.getElementById('species-search').value.toLowerCase();
+  const filtered = currentSite.species.filter(sp =>
+    sp.name.toLowerCase().includes(q) ||
+    getCommonName(sp.name).toLowerCase().includes(q)
+  );
+  renderSpeciesList(filtered);
+}
+
+// ── SPECIES DETAIL ────────────────────────────────────────────────────
+function openSpecies(name) {
+  const sp = currentSite.species.find(s => s.name === name);
+  if (!sp) return;
+  currentSpecies = name;
+
+  document.getElementById('species-title').textContent = getCommonName(name);
+
+  const years = Object.keys(sp.trend);
+  const counts = Object.values(sp.trend);
+  const tableRows = years.map(yr => {
+    const v = sp.trend[yr];
+    return `<tr><td>${yr}</td><td class="${v === null ? 'null-val' : ''}">${v !== null ? v.toLocaleString() : 'No data'}</td></tr>`;
+  }).join('');
+
+  const hasNull = counts.some(v => v === null);
+
+  document.getElementById('species-body').innerHTML = `
+    <div class="species-hero">
+      <div class="species-hero-icon" id="hero-icon">${getBirdEmoji(name)}</div>
+      <div>
+        <h3>${getCommonName(name)}</h3>
+        <div class="sci-name">${name}</div>
+        <span class="location-tag">📍 ${currentSite.name}</span>
+      </div>
+    </div>
+
+    <p class="species-desc">${getSpeciesIntro(name, currentSite.name)}</p>
+
+    <div class="section-title">Population Trend (2017–2022)</div>
+    <div class="chart-container">
+      <canvas id="trend-chart"></canvas>
+    </div>
+    <p class="data-note">Source: NEON · Last updated 2023${hasNull ? ' · Some years have no data (shown as gaps)' : ''}</p>
+
+    <button class="toggle-table-btn" onclick="toggleTable()">Show data table</button>
+    <table class="data-table" id="data-table">
+      <thead><tr><th>Year</th><th>Count</th></tr></thead>
+      <tbody>${tableRows}</tbody>
+    </table>
+
+    <div class="section-title">Conservation Suggestions</div>
+    <div class="ai-card">
+      <div class="ai-header">
+        <span>🤖 AI Suggestions for ${getCommonName(name)}</span>
+      </div>
+      <div class="ai-suggestions">${AI_SUGGESTIONS.default(name)}</div>
+      <div id="ai-key-row" style="display:${openaiKey ? 'none' : 'flex'};gap:0.5rem;margin-bottom:0.5rem;">
+        <input class="ai-input" type="password" id="ai-key-input" placeholder="Paste your Gemini API key to ask questions…" />
+        <button class="ai-ask-btn" onclick="saveKey()">Save</button>
+      </div>
+      <div id="ai-question-row" style="display:${openaiKey ? 'flex' : 'none'};gap:0.5rem;">
+        <input class="ai-input" type="text" id="ai-question" placeholder="Ask a question…" onkeydown="if(event.key==='Enter')askAI()" />
+        <button class="ai-ask-btn" onclick="askAI()">Ask</button>
+      </div>
+      <div id="ai-response" style="font-size:0.85rem;line-height:1.5;color:#2a4a2a;margin-top:0.5rem;display:none;"></div>
+    </div>
+  `;
+
+  // Draw chart
+  if (chartInstance) chartInstance.destroy();
+  const ctx = document.getElementById('trend-chart').getContext('2d');
+  chartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: years,
+      datasets: [{
+        label: 'Bird count',
+        data: counts,
+        borderColor: '#2d5a3d',
+        backgroundColor: 'rgba(45,90,61,0.08)',
+        borderWidth: 2.5,
+        pointRadius: 5,
+        pointBackgroundColor: '#2d5a3d',
+        tension: 0.3,
+        spanGaps: false
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: '#f0f0f0' } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+
+  // Load hero photo
+  fetchBirdImage(name).then(url => {
+    const el = document.getElementById('hero-icon');
+    if (url && el) el.innerHTML =
+      `<img src="${url}" alt="${name}" style="width:100%;height:100%;object-fit:cover;border-radius:14px;">`;
+  });
+
+  openPanel('species-panel');
+}
+
+function toggleTable() {
+  const table = document.getElementById('data-table');
+  const btn = document.querySelector('.toggle-table-btn');
+  table.classList.toggle('visible');
+  btn.textContent = table.classList.contains('visible') ? 'Hide data table' : 'Show data table';
+}
+
+function saveKey() {
+  const input = document.getElementById('ai-key-input');
+  const key = input.value.trim();
+  if (!key) return;
+  openaiKey = key;
+  localStorage.setItem('birdpoint_ai_key', key);
+  document.getElementById('ai-key-row').style.display = 'none';
+  document.getElementById('ai-question-row').style.display = 'flex';
+}
+
+async function askAI() {
+  const questionEl = document.getElementById('ai-question');
+  const q = questionEl.value.trim();
+  if (!q || !openaiKey) return;
+
+  const resp = document.getElementById('ai-response');
+  const btn = document.querySelector('#ai-question-row .ai-ask-btn');
+  resp.style.display = 'block';
+  resp.style.color = '#2a4a2a';
+  resp.textContent = '…';
+  btn.disabled = true;
+
+  try {
+    const commonName = getCommonName(currentSpecies);
+    const systemPrompt = `You are a conservation assistant inside Birdpoint, an app showing NEON bird population data (2017–2022). The user is viewing ${commonName} (family: ${currentSpecies}) at ${currentSite.name}. Answer conservation questions helpfully and specifically. Keep replies to 2–4 sentences.`;
+
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${openaiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: systemPrompt }] },
+          contents: [{ role: 'user', parts: [{ text: q }] }]
+        })
+      }
+    );
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error?.message || `HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    resp.textContent = data.candidates[0].content.parts[0].text.trim();
+    questionEl.value = '';
+  } catch (err) {
+    resp.style.color = '#c0392b';
+    resp.textContent = `Error: ${err.message}`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ── MY SIGHTINGS ──────────────────────────────────────────────────────
+let userSightings = JSON.parse(localStorage.getItem('birdpoint_sightings') || '[]');
+
+function saveSightings() {
+  localStorage.setItem('birdpoint_sightings', JSON.stringify(userSightings));
+  updateSightingCount();
+}
+
+function updateSightingCount() {
+  const el = document.getElementById('sighting-count');
+  el.textContent = userSightings.length ? `My Sightings (${userSightings.length})` : 'My Sightings';
+}
+
+function openSightingsPanel() {
+  const list = document.getElementById('sightings-list');
+  if (!userSightings.length) {
+    list.innerHTML = '<p class="no-sightings">No sightings logged yet.<br>Use the Log button on the home screen.</p>';
+  } else {
+    list.innerHTML = userSightings.slice().reverse().map(s => `
+      <div class="sighting-card">
+        <button class="sc-delete" onclick="deleteSighting(${s.id})">✕ delete</button>
+        <div class="sc-species">🐦 ${s.species}</div>
+        <div class="sc-meta">📍 ${s.siteName} · ${s.date}</div>
+        ${s.notes ? `<div class="sc-notes">"${s.notes}"</div>` : ''}
+      </div>`).join('');
+  }
+  closePanel('location-panel');
+  closePanel('species-panel');
+  openPanel('sightings-panel');
+}
+
+function deleteSighting(id) {
+  userSightings = userSightings.filter(s => s.id !== id);
+  saveSightings();
+  openSightingsPanel();
+}
+
+// ── LOG SIGHTING ──────────────────────────────────────────────────────
+function submitSighting() {
+  const species = document.getElementById('log-species').value.trim();
+  const locationId = document.getElementById('log-location').value;
+  const notes = document.getElementById('log-notes').value.trim();
+  if (!species || !locationId) {
+    alert('Please fill in species and location.');
+    return;
+  }
+  const site = SITES.find(s => s.id === locationId);
+  const sighting = {
+    id: Date.now(),
+    species,
+    siteId: locationId,
+    siteName: site ? site.name : locationId,
+    notes,
+    date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  };
+  userSightings.push(sighting);
+  saveSightings();
+
+  document.getElementById('confirm-banner').classList.add('show');
+  setTimeout(() => {
+    document.getElementById('confirm-banner').classList.remove('show');
+    document.getElementById('log-species').value = '';
+    document.getElementById('log-location').value = '';
+    document.getElementById('log-notes').value = '';
+    showMap();
+  }, 2000);
+}
+
+// ── PANEL HELPERS ─────────────────────────────────────────────────────
+function openPanel(id) {
+  document.getElementById(id).classList.add('open');
+}
+function closePanel(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+// ── BOOT ──────────────────────────────────────────────────────────────
+// Data is embedded inline — no fetch needed.
+updateSightingCount();
+
+// Register service worker (PWA)
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
